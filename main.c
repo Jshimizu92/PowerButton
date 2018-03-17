@@ -1,3 +1,6 @@
+// Rebecca Dun
+// Jacob Shimizu
+
 #include <stdint.h>
 #include <stdbool.h>
 #include "inc/hw_memmap.h"
@@ -27,43 +30,41 @@
 
 void debounce_buttons(void);
 void wait_for_interrupts(void);
-void Button_Handler(void);
-void Debounce_Button(void);
+void button_Handler(void);
+void debounce_Button(void);
 
 volatile unsigned long count = 0; // Every 12.5ns*(period); for timer-interrupt
 volatile unsigned long timeCount = 0; // Every 1 ms; for debouncing
 
 volatile unsigned long ledState = 0;
 volatile unsigned long lastDebounceTime = 0;
-volatile unsigned long In, Out;
 
 _Bool areButtonsToggledOff = 1;
 
-void setup(void) {
-    // Setting Clock to 40MHz
-    SysCtlClockSet(SYSCTL_SYSDIV_5|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
+void portB_Init(void) {
+        // Setting Clock to 40MHz
+       SysCtlClockSet(SYSCTL_SYSDIV_5|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
 
-    //Enabling Port B
-    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+       // Enabling Port B
+       SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
 
-    //Setting LED pins to Output
-    GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, LED_PINS);
+       // Setting LED pins to Output
+       GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, LED_PINS);
 
-    // Set SW1 GPIO as inputs
-    GPIODirModeSet(GPIO_PORTB_BASE, BTN_PINS , GPIO_DIR_MODE_IN);
+       // Set SW1 GPIO as inputs
+       GPIODirModeSet(GPIO_PORTB_BASE, BTN_PINS , GPIO_DIR_MODE_IN);
 
-    // Register, configure and enable the Button Interrupt handler
-    GPIOIntRegister(GPIO_PORTB_BASE, Button_Handler);
-    GPIOIntTypeSet(GPIO_PORTB_BASE, BTN_PINS, GPIO_FALLING_EDGE);
-    GPIOIntEnable(GPIO_PORTB_BASE,  BTN_PINS);
+       // Register, configure and enable the Button Interrupt handler
+       GPIOIntRegister(GPIO_PORTB_BASE, button_Handler);
+       GPIOIntTypeSet(GPIO_PORTB_BASE, BTN_PINS, GPIO_FALLING_EDGE);
+       GPIOIntEnable(GPIO_PORTB_BASE,  BTN_PINS);
 
-    // Enable internal pull up resistors
-    GPIOPadConfigSet(GPIO_PORTB_BASE, BTN_PINS , GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
-    GPIOPadConfigSet(GPIO_PORTB_BASE, LED_PINS , GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD);
+       // Enable internal pull up resistors
+       GPIOPadConfigSet(GPIO_PORTB_BASE, BTN_PINS , GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD_WPU);
+       GPIOPadConfigSet(GPIO_PORTB_BASE, LED_PINS , GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD);
 }
 
-void Timer_Init(void) {
-
+void timer_Init(void) {
     SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
     TimerConfigure(TIMER0_BASE, TIMER_CFG_ONE_SHOT);
 
@@ -74,10 +75,13 @@ void Timer_Init(void) {
     TimerEnable(TIMER0_BASE, TIMER_A);
 }
 
-/* main */
-int main(void){
+void setup(void) {
+    portB_Init();
+    timer_Init();
+}
+
+int main(void) {
   setup();
-  Timer_Init();
 
   while(1){                   // interrupts every 1ms
       GPIOPinWrite(GPIO_PORTB_BASE, LED_PINS, ledState);
@@ -85,8 +89,7 @@ int main(void){
   }
 }
 
-/* Function called when a button is pushed, the duty cycle is incremented by 10% */
-void on_button_pushed() {
+void on_Button_Pushed() {
     ledState ^= LED_ON;
     GPIOPinWrite(GPIO_PORTB_BASE, LED_PINS, ledState);
 }
@@ -98,11 +101,11 @@ void wait_for_interrupts(void) {
 }
 
 /* Interrupt GPIO_PORTB when button pressed */
-void Button_Handler(void){
+void button_Handler(void){
     // Clear interrupt flag
     GPIOIntClear(GPIO_PORTB_BASE, BTN_PINS);
 
-    // Check that portF isn't in default state ie. button is pushed.
+    // Check that portB isn't in default state ie. button is pushed.
     int buttonValue = GPIOPinRead(GPIO_PORTB_BASE, BTN_PINS);
     _Bool wasAButtonPressed = (buttonValue != BUTTONS_NOT_PRESSED);
     if(wasAButtonPressed) {
@@ -114,12 +117,13 @@ void Button_Handler(void){
 }
 
 /* Interrupt for handling button debounce */
-void Debounce_Handler(void) {
+void debounce_Handler(void) {
+    // Clear Timer Interrupt Flag
     TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
 
     // Check if the button is still pressed
     _Bool wasAButtonPressed = (GPIOPinRead(GPIO_PORTB_BASE, BTN_PINS) != BUTTONS_NOT_PRESSED);
     if(wasAButtonPressed) {
-        on_button_pushed();
+        on_Button_Pushed();
     }
 }
